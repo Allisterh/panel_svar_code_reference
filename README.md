@@ -1,4 +1,4 @@
-This repository contains R code for the estimation of Panel Structural Vector Autoregressions (SVAR).
+This repository contains Python, R, and RATS code for the estimation of Panel Structural Vector Autoregressions (SVAR).
 This project aims to provide a robust and efficient implementation for estimating Panel Structural VAR models.
 The code is continuously updated to include new features and fix any identified bugs.
 
@@ -13,7 +13,7 @@ For inquiries and further information, please contact:
 Peter Pedroni
 Email: ppedroni@williams.edu
 
-Special thanks to Jianing Ren for contributions to this project.
+Special thanks to Jianing Ren for contributions to the R code and Gavin Xia for the Python code.
 
 # Updates
 Regular updates are made to enhance functionality and address any issues.
