@@ -8,7 +8,7 @@
 ## user input section
 
 working_directory =  "/Users/gavin/Desktop/PythonSVAR/Jianing_R" # directory of the source code files and the dataset; outputs will also be stored here
-file_name = "pedroni_ppp.xls" # name of the dataset; intended for xls
+file_name = "../data/pedroni_ppp.xls" # name of the dataset; intended for xls
 var_variables = c("lne","lnae") # read variables in order of recursivity if using s-r or l-r id option
 second_stage_variables = c() # column name of secondary regressor(s), if any. Leave as empty string, c(), if no secondary regression 
 panel_identifier = "country" # name of the unique identifier of panel members
