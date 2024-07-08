@@ -3,16 +3,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from statsmodels.tsa.api import VAR
 from plotting import plot_ir
-from shortAndLong import shortAndLong
+from identification import findM
 import copy
 from scipy import stats
     
 # Encapsulation of input to provide default values and keep modularity
 class VAR_input:
-    __slots__ = ['df', 'size', 'variables', 'shocks', 'td_col', 'member_col', 'M', 'sr_constraint', 'lr_constraint', 'sr_sign', 'lr_sign',
+    __slots__ = ['df', 'size', 'variables', 'variable_order', 'shocks', 'td_col', 'member_col', 'M', 'sr_constraint', 'lr_constraint', 'sr_sign', 'lr_sign',
                  'maxlags', 'nsteps', 'lagmethod', 'bootstrap', 'ndraws', 'signif', 'plot', 'savefig_path']
     
-    def __init__(self, variables, shocks, td_col=[], member_col="", M=None, sr_constraint=[], lr_constraint=[], sr_sign=np.array([]), lr_sign=np.array([]),
+    def __init__(self, variables, variable_order, shocks, td_col=[], member_col="", M=None, sr_constraint=np.array([]), lr_constraint=np.array([]), sr_sign=np.array([]), lr_sign=np.array([]),
                  maxlags=5, nsteps=12, lagmethod='aic', bootstrap=True, ndraws=2000, signif=0.05,
                  excel_path="", excel_sheet_name="", df=pd.DataFrame(), plot=True, savefig_path=""):
         # Build input dataframe
@@ -28,6 +28,11 @@ class VAR_input:
                 raise ValueError("Empty input data.")
         
         self.variables = variables
+        self.variable_order = variable_order
+        for var in variable_order:
+            if var not in variables:
+                raise Exception("Stationarity of variable " + var + " is not specified.")
+
         self.shocks = shocks
         self.size = len(self.variables)
         if len(self.shocks) != self.size:
@@ -45,14 +50,14 @@ class VAR_input:
         self.lr_constraint = lr_constraint
 
         if len(sr_sign) == 0:
-            sr_sign = np.full((self.size, self.size), '.')
+            self.sr_sign = np.full((self.size, self.size), '.')
         else:
             if sr_sign.shape != (self.size, self.size):
                 raise ValueError("Incorrect dimensions for short-run sign restrictions.")
             self.sr_sign = sr_sign
         
         if len(lr_sign) == 0:
-            lr_sign = np.full((self.size, self.size), '.')
+            self.lr_sign = np.full((self.size, self.size), '.')
         else:
             if lr_sign.shape != (self.size, self.size):
                 raise ValueError("Incorrect dimensions for long-run sign restrictions.")
@@ -101,8 +106,7 @@ def SVAR(input):
         # Would raise error if there are duplicate times.
         input.df.set_index(input.td_col, inplace = True)
 
-    variable_names = list(input.variables.keys())
-    df = input.df[variable_names]
+    df = input.df[input.variable_order]
 
     # Convert to stationary form
     # This cannot be done in __init__ of VAR_input because, in a data panel,
@@ -139,21 +143,8 @@ def SVAR(input):
         for f in irf.irfs:
             F1 += f
 
-        #input.M = shortAndLong(results.sigma_u, input.sr_constraint, input.lr_constraint, F1)
-        input.M = shortAndLong(np.cov(output.shock.values.T), input.sr_constraint, input.lr_constraint, F1)
-
-        A1 = np.dot(F1, input.M)
-
-        # Sign constraint
-        if not np.all(np.sum((input.sr_sign == '+') | (input.sr_sign == '-'), axis = 0)
-                      + np.sum((input.lr_sign == '+') | (input.lr_sign == '-'), axis = 0) == 1):
-            raise ValueError("Each column must have exactly one sign restriction.")
-
-        flip_col = (np.sum((input.sr_sign!='.') & np.logical_xor(input.M<0, input.sr_sign=='-'),
-                          axis=0) | np.sum((input.lr_sign!='.') & np.logical_xor(A1<0, input.lr_sign=='-'), axis=0)).astype(int)
-        input.M = np.dot(input.M, np.diag(1-flip_col*2)) # 1(flip) -> -1, 0(don't flip) -> 1
-
-    print("Transformation matrix M:\n", input.M)
+        input.M = findM(np.cov(output.shock.values.T), F1, input.sr_constraint, input.lr_constraint,
+                               input.sr_sign, input.lr_sign)
 
     output.ir = irf.irfs
     for i in range(input.nsteps+1):
@@ -188,14 +179,14 @@ def SVAR(input):
                 for j in range(shuffled_shock.shape[0]):
                     shuffled_shock[j] = output.shock.iloc[np.random.randint(0, output.shock.shape[0]-1)]
             
-            shuffled_shock = shuffled_shock / 1
+            # shuffled_shock = shuffled_shock / 1
 
             # Generate bootstrap data
             drop_const = True
 
             initial_cond = np.zeros((output.lag_order, input.size))
             initial_cond = df.iloc[output.lag_order:]
-            boot_input.df = pd.DataFrame(columns = variable_names, data = np.concatenate((initial_cond, shuffled_shock), axis=0))
+            boot_input.df = pd.DataFrame(columns = input.variable_order, data = np.concatenate((initial_cond, shuffled_shock), axis=0))
 
             coefs = np.array(results.params.iloc[1:])
             const = np.zeros(input.size)
@@ -243,7 +234,7 @@ def SVAR(input):
         output.shock.iloc[i, :] = np.dot(M_inv, output.shock.iloc[i,:].T).T # epsilon = M^(-1) * mu
 
     # Convert to impulse reponse of steady state for unit root variables
-    for i, var in enumerate(variable_names):
+    for i, var in enumerate(input.variable_order):
         if input.variables[var][1] == 1:
             output.ir[:, i, :] = output.ir[:, i, :].cumsum(axis=0)
 
@@ -263,7 +254,7 @@ def SVAR(input):
     # print(VD)
 
     if input.plot:
-        plot_ir(variable_names, input.shocks, output.ir,
+        plot_ir(input.variable_order, input.shocks, output.ir,
                 lower_errband=output.ir_lower, upper_errband=output.ir_upper,
                 show_plot=True, save_plot=True, plot_path=input.savefig_path)
     
