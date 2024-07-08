@@ -27,7 +27,7 @@
                 ***  USER INPUT SECTION ***
 
 environment traperrors
-open data pedroni_ppp.xls   ;* name of data set
+open data ../data/pedroni_ppp.xls   ;* name of data set
 data(format=xls,org=obs)    ;* arranged as one column of length N*T per variable
 close data                  ;* stacked as i=1,t=1...T, i=2,t=1,,,T, etc.
 environment notraperrors

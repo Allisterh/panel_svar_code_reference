@@ -25,7 +25,7 @@
 
 
 environment traperrors
-open data test-run.xls
+open data ../data/test-run.xls
 data(format=xls,org=obs)
 close data
 environment notraperrors
